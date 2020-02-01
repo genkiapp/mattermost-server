@@ -20,11 +20,57 @@ func (a *App) GetAllRoles() ([]*model.Role, *model.AppError) {
 }
 
 func (a *App) GetRoleByName(name string) (*model.Role, *model.AppError) {
-	return a.Srv.Store.Role().GetByName(name)
+	role, err := a.Srv.Store.Role().GetByName(name)
+	if err != nil {
+		return nil, err
+	}
+
+	if !role.BuiltIn && role.SchemeManaged {
+		higherScopedPermissionsMap, err := a.Srv.Store.Role().HigherScopedPermissions([]string{name})
+		if err != nil {
+			return nil, err
+		}
+
+		if higherScopedPermissions, ok := higherScopedPermissionsMap[role.Name]; ok {
+			role.MergeHigherScopedPermissions(higherScopedPermissions)
+		}
+	}
+
+	return role, nil
 }
 
 func (a *App) GetRolesByNames(names []string) ([]*model.Role, *model.AppError) {
-	return a.Srv.Store.Role().GetByNames(names)
+	roles, err := a.Srv.Store.Role().GetByNames(names)
+	if err != nil {
+		return nil, err
+	}
+
+	var higherScopeNamesToQuery []string
+
+	for _, role := range roles {
+		if !role.BuiltIn && role.SchemeManaged {
+			higherScopeNamesToQuery = append(higherScopeNamesToQuery, role.Name)
+		}
+	}
+
+	if len(higherScopeNamesToQuery) == 0 {
+		return roles, nil
+	}
+
+	higherScopedPermissionsMap, err := a.Srv.Store.Role().HigherScopedPermissions(higherScopeNamesToQuery)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, role := range roles {
+		if !role.BuiltIn && role.SchemeManaged {
+			if higherScopedPermissions, ok := higherScopedPermissionsMap[role.Name]; ok {
+				role.MergeHigherScopedPermissions(higherScopedPermissions)
+			}
+		}
+	}
+
+	return roles, nil
 }
 
 func (a *App) PatchRole(role *model.Role, patch *model.RolePatch) (*model.Role, *model.AppError) {

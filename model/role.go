@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"io"
 	"strings"
+
+	"github.com/mattermost/mattermost-server/v5/utils/slices"
 )
 
 const (
@@ -86,6 +88,29 @@ func (r *Role) Patch(patch *RolePatch) {
 	if patch.Permissions != nil {
 		r.Permissions = *patch.Permissions
 	}
+}
+
+func (r *Role) MergeHigherScopedPermissions(higherScopedPermissions []string) {
+	mergedPermissions := []string{}
+
+	for _, cp := range ALL_PERMISSIONS {
+		if cp.Scope != PERMISSION_SCOPE_CHANNEL {
+			continue
+		}
+
+		if _, ok := ModeratedPermissions[cp.Id]; ok {
+			if slices.IncludesString(r.Permissions, cp.Id) && slices.IncludesString(higherScopedPermissions, cp.Id) {
+				mergedPermissions = append(mergedPermissions, cp.Id)
+			}
+			continue
+		}
+
+		if slices.IncludesString(higherScopedPermissions, cp.Id) {
+			mergedPermissions = append(mergedPermissions, cp.Id)
+		}
+	}
+
+	r.Permissions = mergedPermissions
 }
 
 // Returns an array of permissions that are in either role.Permissions
