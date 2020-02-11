@@ -140,15 +140,15 @@ func (_m *RoleStore) GetByNames(names []string) ([]*model.Role, *model.AppError)
 }
 
 // HigherScopedPermissions provides a mock function with given fields: roleNames
-func (_m *RoleStore) HigherScopedPermissions(roleNames []string) (map[string][]string, *model.AppError) {
+func (_m *RoleStore) HigherScopedPermissions(roleNames []string) (map[string]*model.RolePermissions, *model.AppError) {
 	ret := _m.Called(roleNames)
 
-	var r0 map[string][]string
-	if rf, ok := ret.Get(0).(func([]string) map[string][]string); ok {
+	var r0 map[string]*model.RolePermissions
+	if rf, ok := ret.Get(0).(func([]string) map[string]*model.RolePermissions); ok {
 		r0 = rf(roleNames)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[string][]string)
+			r0 = ret.Get(0).(map[string]*model.RolePermissions)
 		}
 	}
 

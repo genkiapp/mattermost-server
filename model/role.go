@@ -51,6 +51,11 @@ type RolePatch struct {
 	Permissions *[]string `json:"permissions"`
 }
 
+type RolePermissions struct {
+	RoleID      string
+	Permissions []string
+}
+
 func (r *Role) ToJson() string {
 	b, _ := json.Marshal(r)
 	return string(b)
@@ -90,7 +95,7 @@ func (r *Role) Patch(patch *RolePatch) {
 	}
 }
 
-func (r *Role) MergeHigherScopedPermissions(higherScopedPermissions []string) {
+func (r *Role) MergeHigherScopedPermissions(rolePermissions *RolePermissions) {
 	mergedPermissions := []string{}
 
 	for _, cp := range ALL_PERMISSIONS {
@@ -98,14 +103,19 @@ func (r *Role) MergeHigherScopedPermissions(higherScopedPermissions []string) {
 			continue
 		}
 
+		if rolePermissions.RoleID == CHANNEL_ADMIN_ROLE_ID && slices.IncludesString(rolePermissions.Permissions, cp.Id) {
+			mergedPermissions = append(mergedPermissions, cp.Id)
+			continue
+		}
+
 		if _, ok := ModeratedPermissions[cp.Id]; ok {
-			if slices.IncludesString(r.Permissions, cp.Id) && slices.IncludesString(higherScopedPermissions, cp.Id) {
+			if slices.IncludesString(r.Permissions, cp.Id) && slices.IncludesString(rolePermissions.Permissions, cp.Id) {
 				mergedPermissions = append(mergedPermissions, cp.Id)
 			}
 			continue
 		}
 
-		if slices.IncludesString(higherScopedPermissions, cp.Id) {
+		if slices.IncludesString(rolePermissions.Permissions, cp.Id) {
 			mergedPermissions = append(mergedPermissions, cp.Id)
 		}
 	}

@@ -4747,7 +4747,7 @@ func (s *TimerLayerRoleStore) GetByNames(names []string) ([]*model.Role, *model.
 	return resultVar0, resultVar1
 }
 
-func (s *TimerLayerRoleStore) HigherScopedPermissions(roleNames []string) (map[string][]string, *model.AppError) {
+func (s *TimerLayerRoleStore) HigherScopedPermissions(roleNames []string) (map[string]*model.RolePermissions, *model.AppError) {
 	start := timemodule.Now()
 
 	resultVar0, resultVar1 := s.RoleStore.HigherScopedPermissions(roleNames)

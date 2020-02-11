@@ -4,7 +4,9 @@
 package app
 
 import (
+	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/mattermost/mattermost-server/v5/model"
 	"github.com/mattermost/mattermost-server/v5/utils/slices"
@@ -82,25 +84,42 @@ func testPermissionInheritance(t *testing.T, testCallback func(t *testing.T, th 
 	require.Nil(t, err)
 
 	// See tests/channel-role-has-permission.md for an explanation of the below matrix.
-	// column 1: let p be "higher-scoped scheme has the permission"
-	// column 2: let q be "the permission is moderated"
-	// column 3: let r be "channel scheme has the permission"
+	// column 0: let p be "higher-scoped scheme has the permission"
+	// column 1: let q be "the permission is moderated"
+	// column 2: let r be "channel scheme has the permission"
+	// column 3: let s be "the channel role is 'channel admin'"
 	// column 4: "channel role has the permission"
 	truthTable := [][]bool{
-		{true, true, true, true},
-		{true, true, false, false},
-		{true, false, true, true},
-		{true, false, false, true},
-		{false, true, true, false},
-		{false, true, false, false},
-		{false, false, true, false},
-		{false, false, false, false},
+		{true, true, true, true, true},
+		{true, true, true, false, true},
+		{true, true, false, true, true},
+		{true, true, false, false, false},
+		{true, false, true, true, true},
+		{true, false, true, false, true},
+		{true, false, false, true, true},
+		{true, false, false, false, true},
+		{false, true, true, true, false},
+		{false, true, true, false, false},
+		{false, true, false, true, false},
+		{false, true, false, false, false},
+		{false, false, true, true, false},
+		{false, false, true, false, false},
+		{false, false, false, true, false},
+		{false, false, false, false, false},
 	}
 
 	test := func(higherScopedGuestRoleName, higherScopedUserRoleName, higherScopedAdminRoleName string) {
 		for _, roleNameUnderTest := range []string{higherScopedGuestRoleName, higherScopedUserRoleName, higherScopedAdminRoleName} {
 			for _, row := range truthTable {
-				p, q, r, shouldHavePermission := row[0], row[1], row[2], row[3]
+				p, q, r, s, shouldHavePermission := row[0], row[1], row[2], row[3], row[4]
+
+				if s {
+					roleNameUnderTest = higherScopedAdminRoleName
+				}
+				if !s && roleNameUnderTest == higherScopedAdminRoleName {
+					rand.Seed(time.Now().UnixNano())
+					roleNameUnderTest = []string{higherScopedGuestRoleName, higherScopedUserRoleName}[rand.Intn(2)]
+				}
 
 				// select the permission to test (moderated or non-moderated)
 				var permission *model.Permission
@@ -152,6 +171,7 @@ func testPermissionInheritance(t *testing.T, testCallback func(t *testing.T, th 
 					shouldHavePermission: shouldHavePermission,
 					channel:              channel,
 					higherScopedRole:     higherScopedRole,
+					truthTableRow:        row,
 				})
 			}
 		}
@@ -182,4 +202,5 @@ type permissionInheritanceTestData struct {
 	shouldHavePermission bool
 	channel              *model.Channel
 	higherScopedRole     *model.Role
+	truthTableRow        []bool
 }

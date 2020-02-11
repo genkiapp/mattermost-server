@@ -297,7 +297,7 @@ func (s *SqlRoleStore) higherScopedPermissionsQuery(roleNames []string) string {
 	return fmt.Sprintf(sqlTmpl, strings.Join(roleNames, "', '"))
 }
 
-func (s *SqlRoleStore) HigherScopedPermissions(roleNames []string) (map[string][]string, *model.AppError) {
+func (s *SqlRoleStore) HigherScopedPermissions(roleNames []string) (map[string]*model.RolePermissions, *model.AppError) {
 	sql := s.higherScopedPermissionsQuery(roleNames)
 
 	var rolesPermissions []*channelRolesPermissions
@@ -305,12 +305,12 @@ func (s *SqlRoleStore) HigherScopedPermissions(roleNames []string) (map[string][
 		return nil, model.NewAppError("SqlRoleStore.HigherScopedPermissions", "store.sql_role.get_by_names.app_error", nil, err.Error(), http.StatusInternalServerError)
 	}
 
-	roleNameHigherScopedPermissions := map[string][]string{}
+	roleNameHigherScopedPermissions := map[string]*model.RolePermissions{}
 
 	for _, rp := range rolesPermissions {
-		roleNameHigherScopedPermissions[rp.GuestRoleName] = strings.Split(rp.HigherScopedGuestPermissions, " ")
-		roleNameHigherScopedPermissions[rp.UserRoleName] = strings.Split(rp.HigherScopedUserPermissions, " ")
-		roleNameHigherScopedPermissions[rp.AdminRoleName] = strings.Split(rp.HigherScopedAdminPermissions, " ")
+		roleNameHigherScopedPermissions[rp.GuestRoleName] = &model.RolePermissions{RoleID: model.CHANNEL_GUEST_ROLE_ID, Permissions: strings.Split(rp.HigherScopedGuestPermissions, " ")}
+		roleNameHigherScopedPermissions[rp.UserRoleName] = &model.RolePermissions{RoleID: model.CHANNEL_USER_ROLE_ID, Permissions: strings.Split(rp.HigherScopedUserPermissions, " ")}
+		roleNameHigherScopedPermissions[rp.AdminRoleName] = &model.RolePermissions{RoleID: model.CHANNEL_ADMIN_ROLE_ID, Permissions: strings.Split(rp.HigherScopedAdminPermissions, " ")}
 	}
 
 	return roleNameHigherScopedPermissions, nil
