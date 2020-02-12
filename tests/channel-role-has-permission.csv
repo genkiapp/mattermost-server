@@ -1,4 +1,4 @@
-"let p be ""higher-scoped scheme has the permission""","let q be ""the permission is moderated""","let r be ""channel scheme has the permission""","let s be ""channel role is channel admin""","compound statement for ""channel role has the permission"" (p ∧ (s ∨ (q → r)))"
+"let p be ""higher-scoped scheme has the permission""","let q be ""permission is moderated""","let r be ""channel scheme has the permission""","let s be ""channel role is channel_admin""","""channel role has the permission"" = p ∧ (s ∨ (q → r))"
 TRUE,TRUE,TRUE,TRUE,TRUE
 TRUE,TRUE,TRUE,FALSE,TRUE
 TRUE,TRUE,FALSE,TRUE,TRUE
