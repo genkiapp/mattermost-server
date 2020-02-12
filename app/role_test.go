@@ -4,6 +4,11 @@
 package app
 
 import (
+	"encoding/csv"
+	"io/ioutil"
+	"os"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/mattermost/mattermost-server/v5/model"
@@ -17,7 +22,7 @@ type permissionInheritanceTestData struct {
 	shouldHavePermission bool
 	channel              *model.Channel
 	higherScopedRole     *model.Role
-	truthTableRow        []bool
+	truthTableRow        []string
 }
 
 func TestGetRolesByNames(t *testing.T) {
@@ -90,34 +95,33 @@ func testPermissionInheritance(t *testing.T, testCallback func(t *testing.T, th 
 	channel, err = th.App.UpdateChannelScheme(channel)
 	require.Nil(t, err)
 
-	// See tests/channel-role-has-permission.md for an explanation of the below matrix.
-	// column 0: let p be "higher-scoped scheme has the permission"
-	// column 1: let q be "the permission is moderated"
-	// column 2: let r be "channel scheme has the permission"
-	// column 3: let s be "the channel role is 'channel admin'"
-	// column 4: "channel role has the permission"
-	truthTable := [][]bool{
-		{true, true, true, true, true},
-		{true, true, true, false, true},
-		{true, true, false, true, true},
-		{true, true, false, false, false},
-		{true, false, true, true, true},
-		{true, false, true, false, true},
-		{true, false, false, true, true},
-		{true, false, false, false, true},
-		{false, true, true, true, false},
-		{false, true, true, false, false},
-		{false, true, false, true, false},
-		{false, true, false, false, false},
-		{false, false, true, true, false},
-		{false, false, true, false, false},
-		{false, false, false, true, false},
-		{false, false, false, false, false},
-	}
+	// Get the truth table from CSV
+	file, e := os.Open("tests/channel-role-has-permission.csv")
+	require.Nil(t, e)
+	defer file.Close()
+
+	b, e := ioutil.ReadAll(file)
+	require.Nil(t, e)
+
+	r := csv.NewReader(strings.NewReader(string(b)))
+	records, e := r.ReadAll()
+	require.Nil(t, e)
 
 	test := func(nonAdminRoleName, nonAdminRoleID, higherScopedAdminRoleName string) {
-		for _, row := range truthTable {
-			p, q, r, s, shouldHavePermission := row[0], row[1], row[2], row[3], row[4]
+		for i, row := range records {
+			if i == 0 {
+				continue
+			}
+			p, e := strconv.ParseBool(row[0])
+			require.Nil(t, e)
+			q, e := strconv.ParseBool(row[1])
+			require.Nil(t, e)
+			r, e := strconv.ParseBool(row[2])
+			require.Nil(t, e)
+			s, e := strconv.ParseBool(row[3])
+			require.Nil(t, e)
+			shouldHavePermission, e := strconv.ParseBool(row[4])
+			require.Nil(t, e)
 
 			var roleNameUnderTest string
 			if s {
