@@ -4,14 +4,21 @@
 package app
 
 import (
-	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/mattermost/mattermost-server/v5/model"
 	"github.com/mattermost/mattermost-server/v5/utils/slices"
 	"github.com/stretchr/testify/require"
 )
+
+type permissionInheritanceTestData struct {
+	channelRole          *model.Role
+	permission           *model.Permission
+	shouldHavePermission bool
+	channel              *model.Channel
+	higherScopedRole     *model.Role
+	truthTableRow        []bool
+}
 
 func TestGetRolesByNames(t *testing.T) {
 	testPermissionInheritance(t, func(t *testing.T, th *TestHelper, testData permissionInheritanceTestData) {
@@ -108,77 +115,74 @@ func testPermissionInheritance(t *testing.T, testCallback func(t *testing.T, th 
 		{false, false, false, false, false},
 	}
 
-	test := func(higherScopedGuestRoleName, higherScopedUserRoleName, higherScopedAdminRoleName string) {
-		for _, roleNameUnderTest := range []string{higherScopedGuestRoleName, higherScopedUserRoleName, higherScopedAdminRoleName} {
-			for _, row := range truthTable {
-				p, q, r, s, shouldHavePermission := row[0], row[1], row[2], row[3], row[4]
+	test := func(nonAdminRoleName, nonAdminRoleID, higherScopedAdminRoleName string) {
+		for _, row := range truthTable {
+			p, q, r, s, shouldHavePermission := row[0], row[1], row[2], row[3], row[4]
 
-				if s {
-					roleNameUnderTest = higherScopedAdminRoleName
-				}
-				if !s && roleNameUnderTest == higherScopedAdminRoleName {
-					rand.Seed(time.Now().UnixNano())
-					roleNameUnderTest = []string{higherScopedGuestRoleName, higherScopedUserRoleName}[rand.Intn(2)]
-				}
-
-				// select the permission to test (moderated or non-moderated)
-				var permission *model.Permission
-				if q {
-					permission = model.PERMISSION_CREATE_POST // moderated
-				} else {
-					permission = model.PERMISSION_READ_CHANNEL // non-moderated
-				}
-
-				// add or remove the permission from the higher-scoped scheme
-				higherScopedRole, testErr := th.App.GetRoleByName(roleNameUnderTest)
-				require.Nil(t, testErr)
-
-				var higherScopedPermissions []string
-				if p {
-					higherScopedPermissions = []string{permission.Id}
-				} else {
-					higherScopedPermissions = permissionsDefault
-				}
-				higherScopedRole, testErr = th.App.PatchRole(higherScopedRole, &model.RolePatch{Permissions: &higherScopedPermissions})
-				require.Nil(t, testErr)
-
-				// get channel role
-				var channelRoleName string
-				switch roleNameUnderTest {
-				case higherScopedGuestRoleName:
-					channelRoleName = channelScheme.DefaultChannelGuestRole
-				case higherScopedUserRoleName:
-					channelRoleName = channelScheme.DefaultChannelUserRole
-				case higherScopedAdminRoleName:
-					channelRoleName = channelScheme.DefaultChannelAdminRole
-				}
-				channelRole, testErr := th.App.GetRoleByName(channelRoleName)
-				require.Nil(t, testErr)
-
-				// add or remove the permission from the channel scheme
-				var channelSchemePermissions []string
-				if r {
-					channelSchemePermissions = []string{permission.Id}
-				} else {
-					channelSchemePermissions = permissionsDefault
-				}
-				channelRole, testErr = th.App.PatchRole(channelRole, &model.RolePatch{Permissions: &channelSchemePermissions})
-				require.Nil(t, testErr)
-
-				testCallback(t, th, permissionInheritanceTestData{
-					channelRole:          channelRole,
-					permission:           permission,
-					shouldHavePermission: shouldHavePermission,
-					channel:              channel,
-					higherScopedRole:     higherScopedRole,
-					truthTableRow:        row,
-				})
+			var roleNameUnderTest string
+			if s {
+				roleNameUnderTest = higherScopedAdminRoleName
+			} else {
+				roleNameUnderTest = nonAdminRoleName
 			}
+
+			// select the permission to test (moderated or non-moderated)
+			var permission *model.Permission
+			if q {
+				permission = model.PERMISSION_CREATE_POST // moderated
+			} else {
+				permission = model.PERMISSION_READ_CHANNEL // non-moderated
+			}
+
+			// add or remove the permission from the higher-scoped scheme
+			higherScopedRole, testErr := th.App.GetRoleByName(roleNameUnderTest)
+			require.Nil(t, testErr)
+
+			var higherScopedPermissions []string
+			if p {
+				higherScopedPermissions = []string{permission.Id}
+			} else {
+				higherScopedPermissions = permissionsDefault
+			}
+			higherScopedRole, testErr = th.App.PatchRole(higherScopedRole, &model.RolePatch{Permissions: &higherScopedPermissions})
+			require.Nil(t, testErr)
+
+			// get channel role
+			var channelRoleName string
+			if s {
+				channelRoleName = channelScheme.DefaultChannelAdminRole
+			} else if nonAdminRoleID == model.CHANNEL_GUEST_ROLE_ID {
+				channelRoleName = channelScheme.DefaultChannelGuestRole
+			} else if nonAdminRoleID == model.CHANNEL_USER_ROLE_ID {
+				channelRoleName = channelScheme.DefaultChannelUserRole
+			}
+			channelRole, testErr := th.App.GetRoleByName(channelRoleName)
+			require.Nil(t, testErr)
+
+			// add or remove the permission from the channel scheme
+			var channelSchemePermissions []string
+			if r {
+				channelSchemePermissions = []string{permission.Id}
+			} else {
+				channelSchemePermissions = permissionsDefault
+			}
+			channelRole, testErr = th.App.PatchRole(channelRole, &model.RolePatch{Permissions: &channelSchemePermissions})
+			require.Nil(t, testErr)
+
+			testCallback(t, th, permissionInheritanceTestData{
+				channelRole:          channelRole,
+				permission:           permission,
+				shouldHavePermission: shouldHavePermission,
+				channel:              channel,
+				higherScopedRole:     higherScopedRole,
+				truthTableRow:        row,
+			})
 		}
 	}
 
 	// test all 24 permutations where the higher-scoped scheme is the system scheme
-	test(model.CHANNEL_GUEST_ROLE_ID, model.CHANNEL_USER_ROLE_ID, model.CHANNEL_ADMIN_ROLE_ID)
+	test(model.CHANNEL_GUEST_ROLE_ID, model.CHANNEL_GUEST_ROLE_ID, model.CHANNEL_ADMIN_ROLE_ID)
+	test(model.CHANNEL_USER_ROLE_ID, model.CHANNEL_USER_ROLE_ID, model.CHANNEL_ADMIN_ROLE_ID)
 
 	// create a team scheme, assign it to the team
 	teamScheme, err := th.App.CreateScheme(&model.Scheme{
@@ -193,14 +197,6 @@ func testPermissionInheritance(t *testing.T, testCallback func(t *testing.T, th 
 	require.Nil(t, err)
 
 	// test all 24 permutations where the higher-scoped scheme is a team scheme
-	test(teamScheme.DefaultChannelGuestRole, teamScheme.DefaultChannelUserRole, teamScheme.DefaultChannelAdminRole)
-}
-
-type permissionInheritanceTestData struct {
-	channelRole          *model.Role
-	permission           *model.Permission
-	shouldHavePermission bool
-	channel              *model.Channel
-	higherScopedRole     *model.Role
-	truthTableRow        []bool
+	test(teamScheme.DefaultChannelGuestRole, model.CHANNEL_GUEST_ROLE_ID, teamScheme.DefaultChannelAdminRole)
+	test(teamScheme.DefaultChannelUserRole, model.CHANNEL_USER_ROLE_ID, teamScheme.DefaultChannelAdminRole)
 }
